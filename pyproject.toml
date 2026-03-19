@@ -1,0 +1,40 @@
+[project]
+name = "tts-dictionary-interface"
+description = "Core code for developing Python AMPCS dictionary interfaces."
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "Unlicense"}
+authors = [
+  { name = "muszynsk", email = "matt.muszynski@jpl.nasa.gov" },
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: Unlicense",
+]
+dependencies = [
+  "lxml",
+  "pytest", 
+  "tomli",
+  "tts-utilities>=0.2.2,<=1.0.0"
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/NASA-JPL-Teamtools-Studio/tts_dictionary_interface"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
+
+[build-system]
+requires = [
+  "setuptools", 
+  "wheel", 
+  "toml", 
+  "tts-utilities>=0.2.1,<1.0.0", 
+  "setuptools-scm"
+  ]
+build-backend = "setuptools.build_meta"

@@ -1,0 +1,20 @@
+#When tts-build-sphinx-docs runs, it will collect all tags and branches and attempt to build
+#docs for each in the gh-pages branch. This is a config file that allows developers to 
+#specifically exclude any branches or tags they need. Each line is the name of a tag or 
+#branch.
+#
+#This file makes no attemtpt to tell whether a line is a tag or a branch as TTS assumes that
+#the naming conventions will always be different, and that tags should be tied to releases,
+#so they should always have semvar names, whereas branches should be more descriptive using
+#typical agile branch naming conventions.
+#
+#The most typical use case is to exclude tags that were created before you added the docs
+#prerequisites, or to exclude the gh-pages branch itself since no code is expected to live
+#there. All TTS repos are expected to have a gh-pages branch, but it is expected that it
+#will always be managed by tts-build-sphinx-docs. You do not need to manually create
+#a gh-pages branch because tts-build-sphinx-docs will create one if it does not exist.
+#
+#tts-build-sphinx-docs will also always remove all files from gh-pages and rebuild all docs
+#from scratch
+v1.0.1
+gh-pages
