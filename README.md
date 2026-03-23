@@ -1,6 +1,6 @@
 # Teamtools Dictionary Interface
 
-![Project logo](https://github.com/NASA-JPL-Teamtools-Studio/teamtools-documentation/blob/main/docs/images/tts_image_artifacts/tts_dictionary_interface.png)
+![Project logo](https://github.com/NASA-JPL-Teamtools-Studio/teamtools_documentation/blob/main/docs/images/tts_image_artifacts/tts_dictionary_interface.png)
 
 ## About Teamtools Studio
 
