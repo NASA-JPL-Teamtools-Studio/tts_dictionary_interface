@@ -1,0 +1,12 @@
+/*
+Resolves a bug where the text in the header
+"[package name] [package version] documentation"
+was getting stacked up on top of itself when the variable portions were too long. Something with floats
+and elements not taking up the whole width of their contents.
+
+Needed to add it because setuptools-scm version names can be very long, especially for versions that
+are build off of a commit with no tag
+*/
+.navbar-header-items__start {
+    width: auto;
+}

@@ -1,0 +1,180 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tts_dictionary_interface &mdash; tts-dictionary-interface 0.2.3.dev0+gee3f98ee7.d20260323 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/bugfix.css?v=aa86f000" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=36ae48f6"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="tts-dictionary-interface" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            tts-dictionary-interface
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">tts_dictionary_interface</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-tts_dictionary_interface.base">tts_dictionary_interface.base</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#tts_dictionary_interface.base.SemanticDictionary"><code class="docutils literal notranslate"><span class="pre">SemanticDictionary</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">tts-dictionary-interface</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">tts_dictionary_interface</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-tts_dictionary_interface">
+<span id="tts-dictionary-interface"></span><h1>tts_dictionary_interface<a class="headerlink" href="#module-tts_dictionary_interface" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<section id="module-tts_dictionary_interface.base">
+<span id="tts-dictionary-interface-base"></span><h3>tts_dictionary_interface.base<a class="headerlink" href="#module-tts_dictionary_interface.base" title="Link to this heading"></a></h3>
+<dl class="py class">
+<dt class="sig sig-object py" id="tts_dictionary_interface.base.SemanticDictionary">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">tts_dictionary_interface.base.</span></span><span class="sig-name descname"><span class="pre">SemanticDictionary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">source</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tts_dictionary_interface.base.SemanticDictionary" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A base reading AMPCS dictionaries (or really any XML file) more Pythonically.</p>
+<blockquote>
+<div><p>This class is a bit obtuse, so please take a look at DemoSat’s implementation in
+tts-demosat/demosat_dictionary_interface for an example of how this looks when
+realized against an actual space mission.</p>
+</div></blockquote>
+<p>This class provides a dictionary-like interface to an XML tree. It allows retrieval of
+items via specific unique IDs defined in the subclass configuration, and dynamic
+attribute access via configured XPaths.</p>
+<dl class="simple">
+<dt>Attributes:</dt><dd><p>ITEM_XPATHS (list): A list of XPath strings used to find items. An item in this context is
+the primary human-parseable artifact in the XML. (e.g. for command.xml, it’s a command). If
+you extend SemanticDictionary and do “for x in SemanticDictionaryExtension: x”, you will
+iterate through these “items””
+ITEM_HUMAN_UNIQUE_IDS (list): The expected human-readable ID for items
+ITEM_CLASSES (list): The class to pass items ETREE elements to.
+ATTR_XPATHS (dict): A mapping of XML xpaths to Pyhton attributes</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tts_dictionary_interface.base.SemanticDictionary.ATTR_XPATHS">
+<span class="sig-name descname"><span class="pre">ATTR_XPATHS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#tts_dictionary_interface.base.SemanticDictionary.ATTR_XPATHS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tts_dictionary_interface.base.SemanticDictionary.ITEM_CLASSES">
+<span class="sig-name descname"><span class="pre">ITEM_CLASSES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></span><a class="headerlink" href="#tts_dictionary_interface.base.SemanticDictionary.ITEM_CLASSES" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tts_dictionary_interface.base.SemanticDictionary.ITEM_HUMAN_UNIQUE_IDS">
+<span class="sig-name descname"><span class="pre">ITEM_HUMAN_UNIQUE_IDS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></span><a class="headerlink" href="#tts_dictionary_interface.base.SemanticDictionary.ITEM_HUMAN_UNIQUE_IDS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="tts_dictionary_interface.base.SemanticDictionary.ITEM_XPATHS">
+<span class="sig-name descname"><span class="pre">ITEM_XPATHS</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></span><a class="headerlink" href="#tts_dictionary_interface.base.SemanticDictionary.ITEM_XPATHS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="tts_dictionary_interface.base.SemanticDictionary.xpath">
+<span class="sig-name descname"><span class="pre">xpath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xpath</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#tts_dictionary_interface.base.SemanticDictionary.xpath" title="Link to this definition"></a></dt>
+<dd><p>Run a raw XPath query against the root element of this dictionary. Literally just
+a passthrough of etree.xpath so you can get to any part of the XML you want below
+this node.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>xpath (str): The XPath query string to execute.</p>
+</dd>
+<dt>Returns:</dt><dd><p>list: A list of lxml elements or values matching the query.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="tts-dictionary-interface" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026 JPL.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
