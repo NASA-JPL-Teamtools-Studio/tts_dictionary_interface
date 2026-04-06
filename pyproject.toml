@@ -3,13 +3,13 @@ name = "tts-dictionary-interface"
 description = "Core code for developing Python AMPCS dictionary interfaces."
 readme = "README.md"
 requires-python = ">=3.6"
-license = {text = "Unlicense"}
+license = {text = "Apache-2.0"}
 authors = [
   { name = "muszynsk", email = "matt.muszynski@jpl.nasa.gov" },
 ]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: Unlicense",
+  "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
   "lxml",
