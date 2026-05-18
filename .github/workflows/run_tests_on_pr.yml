@@ -1,4 +1,4 @@
-name: PR Multi-Version Tests
+name: PR Tests
 
 on:
   pull_request:
@@ -12,3 +12,5 @@ permissions:
 jobs:
   call-shared-tests:
     uses: NASA-JPL-Teamtools-Studio/tts_ci_cd/.github/workflows/run_tests_on_pr.yml@main
+    with:
+      package_name: tts_dictionary_interface
