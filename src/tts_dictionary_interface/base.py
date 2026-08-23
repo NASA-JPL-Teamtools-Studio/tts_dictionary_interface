@@ -1,8 +1,14 @@
 import pdb
 from pathlib import Path
 import os
-import importlib.resources as resources
 from lxml import etree
+
+try:
+    # Python 3.9+ 
+    from importlib.resources import files, as_file
+except ImportError:
+    # Backport for Python 3.6, 3.7, and 3.8
+    from importlib_resources import files, as_file
 
 from tts_utilities.logger import create_logger
 logger = create_logger('semantic_dictionary')
@@ -99,11 +105,11 @@ class SemanticDictionary:
 
             package_target = f"{self.DICTIONARY_MODULE}.{source_str}"
             try:
-                # Use importlib.resources to safely locate the file (works in zipped wheels too)
-                traversable_path = resources.files(package_target).joinpath(self.DICTIONARY_FILENAME)
+                # Use importlib.resources backport to safely locate the file (works in zipped wheels too)
+                traversable_path = files(package_target).joinpath(self.DICTIONARY_FILENAME)
                 
                 # Extract to a temporary file if zipped, or use direct path if on standard filesystem
-                with resources.as_file(traversable_path) as xml_path:
+                with as_file(traversable_path) as xml_path:
                     if not xml_path.exists():
                         raise FileNotFoundError(f"File '{self.DICTIONARY_FILENAME}' not found in package '{package_target}'.")
                     
@@ -117,7 +123,7 @@ class SemanticDictionary:
                     f"in '{package_target}/{self.DICTIONARY_FILENAME}': {e}"
                 )
 
-        # 3. Parse the explicit local file path (bypasses importlib entirely)
+        # 3. Parse the explicit local file path
         tree = etree.parse(source_str)
         self.etree = tree.getroot()
 
