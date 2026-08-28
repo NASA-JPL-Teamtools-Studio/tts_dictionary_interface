@@ -3,6 +3,13 @@ from pathlib import Path
 import os
 from lxml import etree
 
+try:
+    # Python 3.9+ 
+    from importlib.resources import files, as_file
+except ImportError:
+    # Backport for Python 3.6, 3.7, and 3.8
+    from importlib_resources import files, as_file
+
 from tts_utilities.logger import create_logger
 logger = create_logger('semantic_dictionary')
 
@@ -31,9 +38,9 @@ class SemanticDictionary:
     """
     A base reading AMPCS dictionaries (or really any XML file) more Pythonically.
 
-	This class is a bit obtuse, so please take a look at DemoSat's implementation in
-	tts-demosat/demosat_dictionary_interface for an example of how this looks when
-	realized against an actual space mission.
+    This class is a bit obtuse, so please take a look at DemoSat's implementation in
+    tts-demosat/demosat_dictionary_interface for an example of how this looks when
+    realized against an actual space mission.
 
     This class provides a dictionary-like interface to an XML tree. It allows retrieval of
     items via specific unique IDs defined in the subclass configuration, and dynamic
@@ -47,33 +54,78 @@ class SemanticDictionary:
         ITEM_HUMAN_UNIQUE_IDS (list): The expected human-readable ID for items
         ITEM_CLASSES (list): The class to pass items ETREE elements to.
         ATTR_XPATHS (dict): A mapping of XML xpaths to Pyhton attributes
+        DICTIONARY_MODULE (str): Package path containing dictionaries (e.g., "demosat_dict.dictionaries").
+        DICTIONARY_FILENAME (str): Filename of the target XML (e.g., "command.xml").
     """
     ITEM_XPATHS = []
     ITEM_HUMAN_UNIQUE_IDS = []
     ITEM_CLASSES = []
     ATTR_XPATHS = {}
 
-    def __init__(self, source):
+    # Configuration for auto-resolving packaged dictionaries
+    DICTIONARY_MODULE = None
+    DICTIONARY_FILENAME = None
+
+    def __init__(self, source=None):
         """
-        Initialize the SemanticDictionary with a source XML.
+        Initialize the SemanticDictionary.
 
         Args:
-            source (str, os.PathLike, etree._ElementTree, or etree.Element): The source of the
-                XML data. This can be a file path string, a Path object, a full ElementTree,
-                or a specific Element node. This library is meant to be called recursively,
-                so this might be the file passed by the user or it might be an ETREE Element
-                passed by another SemanticDictionary
+            source (str, os.PathLike, etree._ElementTree, or etree.Element): 
+                The source of the XML data or a dictionary version string.
+                - Version string (e.g., 'v1', 'v2', 'current'): Resolves the file from DICTIONARY_MODULE.
+                - File path string or Path object: Parses the specified XML file on disk.
+                - etree._ElementTree or etree.Element: Uses the pre-parsed XML node directly.
+
+        Raises:
+            ValueError: If source is None.
+            FileNotFoundError: If a version string or file path fails to resolve.
         """
-        # Check if source is a string OR a Path object (os.PathLike covers pathlib)
-        if isinstance(source, (str, os.PathLike)):
-            # Force conversion to string for lxml.parse, just to be safe
-            tree = etree.parse(str(source))
-            self.etree = tree.getroot()
-        elif isinstance(source, etree._ElementTree):
-            self.etree = source.getroot()
-        else:
-            # Assume it is already an lxml Element
-            self.etree = source
+        if source is None:
+            raise ValueError(
+                f"Must explicitly specify a version (e.g., {self.__class__.__name__}('v1') "
+                f"or {self.__class__.__name__}('current')), a file path, or an XML node."
+            )
+
+        # 1. Handle in-memory lxml ElementTree or Element nodes
+        if not isinstance(source, (str, os.PathLike)):
+            self.etree = source.getroot() if hasattr(source, 'getroot') else source
+            return
+
+        source_str = str(source)
+
+        # 2. Check if source is a file path or a version tag (e.g., 'v1', 'v2', 'current')
+        # All valid dictionary file paths end in '.xml'. If it doesn't, treat it as a version package.
+        if not source_str.lower().endswith('.xml'):
+            if not self.DICTIONARY_MODULE or not self.DICTIONARY_FILENAME:
+                raise ValueError(
+                    f"Attempted to resolve version '{source_str}', but {self.__class__.__name__} "
+                    f"does not define DICTIONARY_MODULE and DICTIONARY_FILENAME."
+                )
+
+            package_target = f"{self.DICTIONARY_MODULE}.{source_str}"
+            try:
+                # Use importlib.resources backport to safely locate the file (works in zipped wheels too)
+                traversable_path = files(package_target).joinpath(self.DICTIONARY_FILENAME)
+                
+                # Extract to a temporary file if zipped, or use direct path if on standard filesystem
+                with as_file(traversable_path) as xml_path:
+                    if not xml_path.exists():
+                        raise FileNotFoundError(f"File '{self.DICTIONARY_FILENAME}' not found in package '{package_target}'.")
+                    
+                    # Parse the tree inside the context manager
+                    tree = etree.parse(str(xml_path))
+                    self.etree = tree.getroot()
+                    return  # Successfully parsed the package resource, we are done
+            except Exception as e:
+                raise FileNotFoundError(
+                    f"Failed to resolve version '{source_str}' for {self.__class__.__name__} "
+                    f"in '{package_target}/{self.DICTIONARY_FILENAME}': {e}"
+                )
+
+        # 3. Parse the explicit local file path
+        tree = etree.parse(source_str)
+        self.etree = tree.getroot()
 
     def xpath(self, xpath):
         """
@@ -241,4 +293,4 @@ class SemanticDictionary:
             if self.etree.xpath(query):
                 return True
                 
-        return False        
+        return False
