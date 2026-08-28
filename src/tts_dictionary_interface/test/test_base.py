@@ -10,7 +10,7 @@ sys.modules['tts_utilities.logger'] = MagicMock()
 
 # Assuming the user's code is in a file named `semantic_dictionary.py`
 # If you are pasting this into a single file, put the class definition above this line.
-from tts_dictionary_interface.base import SemanticDictionary
+from tts_dictionary_interface.base import SemanticDictionary, DictionaryAttributeError
 
 # --- FIXTURES AND SETUP ---
 
@@ -140,16 +140,29 @@ class TestGetAttr:
         # Let's try accessing a root attribute that doesn't exist
         assert concrete_dict.non_existent_attr is None
 
-    def test_getattr_xpath_no_elements_returns_none(self, concrete_dict):
-        # We temporarily add a broken configuration to the class
+    def test_getattr_xpath_no_elements_raises(self, concrete_dict):
+        # A configured single-valued attribute that matches zero elements
+        # must raise DictionaryAttributeError instead of silently returning
+        # None (see #3).
         ConcreteDictionary.ATTR_XPATHS['broken'] = ('.//NonExistentTag', True, None)
-        
-        # Access it
-        val = concrete_dict.broken
-        
-        # ASSERT: It should just return None gracefully (no crash)
-        # We removed the logger check because your implementation doesn't log anymore.
-        assert val is None
+
+        with pytest.raises(DictionaryAttributeError):
+            concrete_dict.broken
+
+    def test_getattr_xpath_no_elements_is_attribute_error(self, concrete_dict):
+        # DictionaryAttributeError must subclass AttributeError so hasattr()
+        # and getattr(obj, name, default) remain valid escape hatches.
+        ConcreteDictionary.ATTR_XPATHS['broken'] = ('.//NonExistentTag', True, None)
+
+        assert hasattr(concrete_dict, 'broken') is False
+        assert getattr(concrete_dict, 'broken', 'default') == 'default'
+
+    def test_getattr_return_list_no_elements_returns_empty_list(self, concrete_dict):
+        # A configured list-valued attribute (return_list=True) that matches
+        # zero elements should still return [], not raise.
+        ConcreteDictionary.ATTR_XPATHS['broken_list'] = ('.//NonExistentTag', True, None, True)
+
+        assert concrete_dict.broken_list == []
 
 class TestIteration:
     """Tests for __iter__"""

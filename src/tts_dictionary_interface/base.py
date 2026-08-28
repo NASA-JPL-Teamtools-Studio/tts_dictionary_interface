@@ -13,6 +13,18 @@ except ImportError:
 from tts_utilities.logger import create_logger
 logger = create_logger('semantic_dictionary')
 
+
+class DictionaryAttributeError(AttributeError):
+    """
+    Raised when a single-valued attribute configured in ATTR_XPATHS resolves
+    to zero elements against the underlying dictionary.
+
+    Subclasses AttributeError so hasattr() and getattr(obj, name, default)
+    remain valid, intentional ways to probe attributes that are legitimately
+    optional for a given item.
+    """
+    pass
+
 #Requirements:
 #    Commands
 #        Every project needs to have a command dictioanry
@@ -230,8 +242,17 @@ class SemanticDictionary:
 
             # --- 1. Nothing Found ---
             if len(element_list) == 0:
-                # If expecting a list, return empty list. Otherwise None.
-                return [] if return_list else None
+                # If expecting a list, an empty list is a legitimate result
+                # (zero items is not the same failure mode as "this
+                # single-valued attribute doesn't exist"). Otherwise, raise:
+                # silently returning None here hides typos and missing
+                # dictionary entries (see #3).
+                if return_list:
+                    return []
+                raise DictionaryAttributeError(
+                    f"'{self.__class__.__name__}' object has no value for "
+                    f"attribute '{attr}' (xpath '{xpath}' matched zero elements)"
+                )
 
             # --- 2. List Requested ---
             if return_list:
