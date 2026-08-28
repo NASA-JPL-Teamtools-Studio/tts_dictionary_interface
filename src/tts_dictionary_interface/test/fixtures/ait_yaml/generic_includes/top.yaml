@@ -1,0 +1,8 @@
+- !include mid/mid.yaml
+- !Packet
+  name: TOP_LEVEL_PACKET
+  fields:
+    - !Field
+      name: top_field
+      bytes: 0
+      type: U8

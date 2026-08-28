@@ -1,0 +1,8 @@
+- !include leaf/leaf.yaml
+- !Packet
+  name: MID_LEVEL_PACKET
+  fields:
+    - !Field
+      name: mid_field
+      bytes: 1
+      type: U8
