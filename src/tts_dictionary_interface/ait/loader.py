@@ -23,6 +23,8 @@ import os
 
 import yaml
 
+from tts_dictionary_interface.tree import TreeSemanticDictionary, _flatten
+
 
 class IncludeLoader(yaml.SafeLoader):
     """
@@ -70,3 +72,29 @@ def load_yaml(path):
     """
     with open(path, 'r') as f:
         return yaml.load(f, IncludeLoader)
+
+
+class AitYamlDictionary(TreeSemanticDictionary):
+    """
+    A `TreeSemanticDictionary` sourced from an AIT-flavored YAML file:
+    resolves `!include` directives via `load_yaml` and flattens the
+    result into a single flat list, so a document assembled from nested
+    includes (like the real oco3mos `tlm.yaml` manifests) behaves like
+    one flat list of items regardless of how many files it's split
+    across.
+
+    Concrete subclasses set `DICTIONARY_FILENAME` (e.g. 'cmd.yaml') so
+    that `source=<a directory>` or `source=<a version string>` (resolved
+    against `DICTIONARY_MODULE`) both know which file to load.
+    """
+
+    @classmethod
+    def _load_file(cls, path):
+        if os.path.isdir(path):
+            if not cls.DICTIONARY_FILENAME:
+                raise ValueError(
+                    f"{cls.__name__} must define DICTIONARY_FILENAME to load from a directory."
+                )
+            path = os.path.join(path, cls.DICTIONARY_FILENAME)
+        loaded = load_yaml(path)
+        return _flatten(loaded) if isinstance(loaded, list) else loaded

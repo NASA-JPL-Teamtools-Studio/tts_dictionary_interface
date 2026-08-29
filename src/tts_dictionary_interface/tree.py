@@ -30,7 +30,13 @@ Every step, and the path as a whole, always resolves to a list, exactly
 like XPath -- callers can't tell from the return type alone whether zero,
 one, or many things matched.
 """
+import os
 import re
+
+try:
+    from importlib.resources import files, as_file
+except ImportError:
+    from importlib_resources import files, as_file
 
 from tts_dictionary_interface.base import DictionaryAttributeError
 
@@ -113,8 +119,77 @@ class TreeSemanticDictionary:
     ITEM_CLASSES = []
     ATTR_PATHS = {}
 
-    def __init__(self, node):
-        self.node = node
+    # Configuration for auto-resolving packaged dictionaries, mirroring
+    # SemanticDictionary's DICTIONARY_MODULE/DICTIONARY_FILENAME.
+    DICTIONARY_MODULE = None
+    DICTIONARY_FILENAME = None
+
+    def __init__(self, source=None):
+        """
+        Args:
+            source (dict, list, str, or os.PathLike):
+                - dict or list: a pre-parsed node, used directly.
+                - File or directory path: passed to `_load_file()`.
+                - Version string (e.g. 'v1', 'current'): resolves a file
+                  or directory named DICTIONARY_FILENAME (if any) inside
+                  the `DICTIONARY_MODULE.<source>` package, then passes
+                  it to `_load_file()`.
+
+        Raises:
+            ValueError: If source is None, or if resolving a version
+                string is attempted without DICTIONARY_MODULE set.
+            FileNotFoundError: If a version string or file path fails to
+                resolve.
+        """
+        if source is None:
+            raise ValueError(
+                f"Must explicitly specify a version (e.g., {self.__class__.__name__}('v1') "
+                f"or {self.__class__.__name__}('current')), a file/directory path, or a "
+                f"pre-parsed node (dict/list)."
+            )
+
+        if isinstance(source, (dict, list)):
+            self.node = source
+            return
+
+        source_str = str(source)
+
+        if os.path.exists(source_str):
+            self.node = self._load_file(source_str)
+            return
+
+        if not self.DICTIONARY_MODULE:
+            raise ValueError(
+                f"Attempted to resolve version '{source_str}', but {self.__class__.__name__} "
+                f"does not define DICTIONARY_MODULE."
+            )
+
+        package_target = f"{self.DICTIONARY_MODULE}.{source_str}"
+        try:
+            traversable_path = files(package_target)
+            with as_file(traversable_path) as resolved_path:
+                if not resolved_path.exists():
+                    raise FileNotFoundError(f"Package '{package_target}' does not exist.")
+                self.node = self._load_file(str(resolved_path))
+        except Exception as e:
+            raise FileNotFoundError(
+                f"Failed to resolve version '{source_str}' for {self.__class__.__name__} "
+                f"in '{package_target}': {e}"
+            )
+
+    @classmethod
+    def _load_file(cls, path):
+        """
+        Turn a resolved file or directory path into this dictionary's
+        node. This base engine has no opinion on file formats -- a
+        format-specific mixin (e.g. `tts_dictionary_interface.ait.
+        AitYamlDictionary`) must override this to support path/version
+        sources at all; without it, only pre-parsed dict/list sources
+        work.
+        """
+        raise NotImplementedError(
+            f"{cls.__name__} must override _load_file() to support file/directory/version sources."
+        )
 
     def path(self, path):
         """Run a raw path query against this node. See module docstring."""
