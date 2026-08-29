@@ -134,17 +134,11 @@ def test_generic_tree_class_satisfies_evr_contract():
 
 
 class JsonTreeDocument(TreeSemanticDictionary):
-    """A trivial format-specific mixin, just to test the source=path/
-    version resolution machinery without depending on any real
-    packaged mission dictionary."""
+    """
+    No `_load_file` override at all -- exercises the base class's own
+    autodetected-by-extension loading directly.
+    """
     DICTIONARY_FILENAME = 'doc.json'
-
-    @classmethod
-    def _load_file(cls, path):
-        if os.path.isdir(path):
-            path = os.path.join(path, cls.DICTIONARY_FILENAME)
-        with open(path) as f:
-            return json.load(f)
 
 
 def test_source_none_raises_value_error():
@@ -157,11 +151,18 @@ def test_source_dict_or_list_is_used_directly():
     assert doc.node == GENERIC_DOCUMENT
 
 
-def test_source_file_path_is_loaded_via_load_file(tmp_path):
+def test_source_json_file_path_is_autodetected(tmp_path):
     doc_path = tmp_path / 'doc.json'
     doc_path.write_text(json.dumps(GENERIC_DOCUMENT))
     doc = JsonTreeDocument(str(doc_path))
     assert doc.node == GENERIC_DOCUMENT
+
+
+def test_source_yaml_file_path_is_autodetected(tmp_path):
+    doc_path = tmp_path / 'doc.yaml'
+    doc_path.write_text('- name: PACKET_A\n  fields: []\n')
+    doc = TreeSemanticDictionary(str(doc_path))
+    assert doc.node == [{'name': 'PACKET_A', 'fields': []}]
 
 
 def test_source_directory_path_is_loaded_via_dictionary_filename(tmp_path):
@@ -175,8 +176,13 @@ def test_source_version_string_without_dictionary_module_raises():
         JsonTreeDocument('v1')
 
 
-def test_base_tree_class_without_load_file_override_rejects_path_source(tmp_path):
-    doc_path = tmp_path / 'doc.json'
-    doc_path.write_text(json.dumps(GENERIC_DOCUMENT))
-    with pytest.raises(NotImplementedError):
+def test_source_unrecognized_extension_raises_value_error(tmp_path):
+    doc_path = tmp_path / 'doc.xml'
+    doc_path.write_text('<not-a-tree-format/>')
+    with pytest.raises(ValueError):
         TreeSemanticDictionary(str(doc_path))
+
+
+def test_directory_source_without_dictionary_filename_raises(tmp_path):
+    with pytest.raises(ValueError):
+        TreeSemanticDictionary(str(tmp_path))

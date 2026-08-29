@@ -30,8 +30,11 @@ Every step, and the path as a whole, always resolves to a list, exactly
 like XPath -- callers can't tell from the return type alone whether zero,
 one, or many things matched.
 """
+import json
 import os
 import re
+
+import yaml
 
 try:
     from importlib.resources import files, as_file
@@ -181,14 +184,33 @@ class TreeSemanticDictionary:
     def _load_file(cls, path):
         """
         Turn a resolved file or directory path into this dictionary's
-        node. This base engine has no opinion on file formats -- a
-        format-specific mixin (e.g. `tts_dictionary_interface.ait.
-        AitYamlDictionary`) must override this to support path/version
-        sources at all; without it, only pre-parsed dict/list sources
-        work.
+        node.
+
+        Autodetects plain JSON and plain YAML by extension -- this covers
+        any dict/list format with no format-specific loading quirks of
+        its own (e.g. F-Prime's JSON topology dictionaries). Formats that
+        need something more (AIT-flavored YAML's `!include` resolution,
+        say) should override this method entirely rather than fight it;
+        see `tts_dictionary_interface.ait.AitYamlDictionary` for an
+        example.
         """
-        raise NotImplementedError(
-            f"{cls.__name__} must override _load_file() to support file/directory/version sources."
+        if os.path.isdir(path):
+            if not cls.DICTIONARY_FILENAME:
+                raise ValueError(
+                    f"{cls.__name__} must define DICTIONARY_FILENAME to load from a directory."
+                )
+            path = os.path.join(path, cls.DICTIONARY_FILENAME)
+
+        extension = os.path.splitext(path)[1].lower()
+        with open(path) as f:
+            if extension == '.json':
+                return json.load(f)
+            if extension in ('.yaml', '.yml'):
+                return yaml.safe_load(f)
+
+        raise ValueError(
+            f"{cls.__name__} doesn't know how to load '{path}' -- unrecognized extension "
+            f"'{extension}'. Override _load_file() to support this format."
         )
 
     def path(self, path):
