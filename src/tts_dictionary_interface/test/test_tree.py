@@ -4,7 +4,7 @@ import os
 import pytest
 
 from tts_dictionary_interface.contracts import ChannelContract, EvrContract
-from tts_dictionary_interface.tree import TreeSemanticDictionary, select
+from tts_dictionary_interface.tree import TreeSemanticDictionary, _accepts_document_arg, select
 
 pytestmark = pytest.mark.unreviewed_ai
 
@@ -186,3 +186,145 @@ def test_source_unrecognized_extension_raises_value_error(tmp_path):
 def test_directory_source_without_dictionary_filename_raises(tmp_path):
     with pytest.raises(ValueError):
         TreeSemanticDictionary(str(tmp_path))
+
+
+# --- Cross-document resolution (issue #31) ---
+#
+# A deliberately generic, non-F-Prime-specific fixture mirroring the
+# abstract shape of a "type table" / "lookup table" tree format: a flat
+# list of items, each indirecting into a separate top-level lookup array
+# by a ref/id key rather than embedding the full definition inline
+# (F-Prime's per-field `type` -> top-level `typeDefinitions` by
+# `qualifiedName` is one concrete example of this shape).
+GENERIC_LOOKUP_DOCUMENT = {
+    'items': [
+        {'name': 'itemA', 'kindRef': 'refX'},
+        {'name': 'itemB', 'kindRef': 'refY'},
+    ],
+    'kindDefinitions': [
+        {'kindRef': 'refX', 'kindName': 'KindX', 'size': 4},
+        {'kindRef': 'refY', 'kindName': 'KindY', 'size': 8},
+    ],
+}
+
+
+class LookupItem(TreeSemanticDictionary):
+    ATTR_PATHS = {
+        'name': ('.', lambda node: node['name']),
+        'kind_ref': ('.', lambda node: node['kindRef']),
+        # A two-argument value-transform: resolves `kind_name` by
+        # looking up this item's own `kindRef` against the *parent
+        # document's* top-level `kindDefinitions` section -- a section
+        # this item was never itself matched from.
+        'kind_name': (
+            '.',
+            lambda node, item: select(
+                item.document, f'kindDefinitions[kindRef="{node["kindRef"]}"]/kindName'
+            )[0],
+        ),
+    }
+
+
+class LookupDocument(TreeSemanticDictionary):
+    ITEM_PATHS = ['items']
+    ITEM_HUMAN_UNIQUE_IDS = ['name']
+    ITEM_CLASSES = [LookupItem]
+
+
+def test_attr_paths_callable_resolves_against_parent_document_via_getitem():
+    doc = LookupDocument(GENERIC_LOOKUP_DOCUMENT)
+    item = doc['itemA']
+    assert item.kind_ref == 'refX'
+    assert item.kind_name == 'KindX'
+
+
+def test_attr_paths_callable_resolves_against_parent_document_via_iter():
+    doc = LookupDocument(GENERIC_LOOKUP_DOCUMENT)
+    kind_names = {p.name: p.kind_name for p in doc}
+    assert kind_names == {'itemA': 'KindX', 'itemB': 'KindY'}
+
+
+def test_accepts_document_arg_detects_two_positional_arg_callables():
+    assert _accepts_document_arg(lambda node, item: None) is True
+    assert _accepts_document_arg(lambda node: None) is False
+
+
+def test_single_argument_attr_paths_callable_is_unaffected_by_document_support():
+    # The pre-existing, single-argument `lambda node: ...` convention
+    # must keep resolving against only the item's own node, unchanged,
+    # even though every TreeSemanticDictionary instance now always has a
+    # `.document`.
+    class SingleArgItem(TreeSemanticDictionary):
+        ATTR_PATHS = {'name': ('.', lambda node: node['name'])}
+
+    item = SingleArgItem({'name': 'field_one'})
+    assert item.name == 'field_one'
+    assert item.document == item.node
+
+
+def test_top_level_document_is_its_own_document_by_default():
+    doc = LookupDocument(GENERIC_LOOKUP_DOCUMENT)
+    assert doc.document is doc.node
+
+
+def test_nested_item_document_propagates_past_its_own_item_path():
+    # Nested two ITEM_PATHS levels deep (document -> packet -> field), a
+    # field's `.document` must still be the *root* document, not its
+    # immediate parent packet's own (much smaller) node -- proving
+    # `.document` propagates all the way down regardless of nesting
+    # depth, not just one level.
+    nested_document = {
+        'packets': [
+            {
+                'name': 'PACKET_A',
+                'fields': [{'name': 'field_one', 'kindRef': 'refX'}],
+            },
+        ],
+        'kindDefinitions': [
+            {'kindRef': 'refX', 'kindName': 'KindX'},
+        ],
+    }
+
+    class NestedField(TreeSemanticDictionary):
+        ATTR_PATHS = {
+            'name': ('.', lambda node: node['name']),
+            'kind_name': (
+                '.',
+                lambda node, item: select(
+                    item.document, f'kindDefinitions[kindRef="{node["kindRef"]}"]/kindName'
+                )[0],
+            ),
+        }
+
+    class NestedPacket(TreeSemanticDictionary):
+        ATTR_PATHS = {'name': ('.', lambda node: node['name'])}
+        ITEM_PATHS = ['fields']
+        ITEM_HUMAN_UNIQUE_IDS = ['name']
+        ITEM_CLASSES = [NestedField]
+
+    class NestedDocument(TreeSemanticDictionary):
+        ITEM_PATHS = ['packets']
+        ITEM_HUMAN_UNIQUE_IDS = ['name']
+        ITEM_CLASSES = [NestedPacket]
+
+    doc = NestedDocument(nested_document)
+    field = doc['PACKET_A']['field_one']
+    assert field.document is doc.node
+    assert field.kind_name == 'KindX'
+
+
+def test_ait_yaml_dictionary_construction_is_unaffected_by_document_kwarg():
+    # AitYamlDictionary and its consumers pass no `document` kwarg
+    # explicitly and need no cross-document resolution -- the
+    # generalized __init__ signature (and itemclass(x, document=...)
+    # construction) must not break that.
+    from tts_dictionary_interface.ait.loader import AitYamlDictionary
+
+    class SimpleAitDictionary(AitYamlDictionary):
+        ITEM_PATHS = ['.']
+        ITEM_HUMAN_UNIQUE_IDS = ['name']
+        ITEM_CLASSES = [GenericPacket]
+
+    doc = SimpleAitDictionary(GENERIC_DOCUMENT)
+    assert doc.document is doc.node
+    assert [p.name for p in doc] == ['PACKET_A', 'PACKET_B']
