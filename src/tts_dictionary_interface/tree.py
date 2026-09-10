@@ -56,7 +56,6 @@ Cross-document resolution:
     `ATTR_PATHS` itself, and every pre-existing single-argument callable
     keeps working completely unchanged.
 """
-import inspect
 import json
 import os
 import re
@@ -68,7 +67,7 @@ try:
 except ImportError:
     from importlib_resources import files, as_file
 
-from tts_dictionary_interface.base import DictionaryAttributeError
+from tts_dictionary_interface.base import BaseSemanticDictionary
 
 _SEGMENT_RE = re.compile(r'^([^\[]*)(?:\[(.*)\])?$')
 
@@ -137,106 +136,23 @@ def select(node, path):
     return current
 
 
-def _accepts_document_arg(func):
-    """
-    Whether `func` (an `ATTR_PATHS` value-transform callable -- the
-    second element of an `ATTR_PATHS` config tuple, `config[1]`) is
-    written to accept a second positional argument -- the constructed
-    item itself, which exposes `.document` -- in addition to the matched
-    value it's always called with.
-
-    This is what lets `ATTR_PATHS` configs opt into cross-document
-    resolution (see the module docstring and
-    `TreeSemanticDictionary.__getattr__`) while every existing
-    single-argument `lambda node: ...` callable keeps working completely
-    unchanged: this only ever adds a second argument to the call, never
-    removes the first.
-
-    Deliberately permissive about what `func` is (a plain function, a
-    lambda, a class, a builtin, ...) -- anything whose signature can't be
-    introspected (e.g. many builtins) is assumed to be single-argument,
-    which is the safe, backward-compatible default.
-    """
-    try:
-        signature = inspect.signature(func)
-    except (TypeError, ValueError):
-        return False
-
-    parameters = list(signature.parameters.values())
-    if any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in parameters):
-        return True
-
-    positional = [
-        p for p in parameters
-        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-    ]
-    return len(positional) >= 2
-
-
-class TreeSemanticDictionary:
+class TreeSemanticDictionary(BaseSemanticDictionary):
     """
     The dict/list-tree analog of `SemanticDictionary`. See module
     docstring for the path language, and `SemanticDictionary` for the
     concepts (`ATTR_PATHS`/`ITEM_PATHS`/`ITEM_CLASSES`/
     `ITEM_HUMAN_UNIQUE_IDS`) this mirrors.
     """
-    ITEM_PATHS = []
-    ITEM_HUMAN_UNIQUE_IDS = []
-    ITEM_CLASSES = []
-    ATTR_PATHS = {}
+    # These are defined in BaseSemanticDictionary
 
-    # Configuration for auto-resolving packaged dictionaries, mirroring
-    # SemanticDictionary's DICTIONARY_MODULE/DICTIONARY_FILENAME.
-    DICTIONARY_MODULE = None
-    DICTIONARY_FILENAME = None
-
-    def __init__(self, source=None, document=None):
-        """
-        Args:
-            source (dict, list, str, or os.PathLike):
-                - dict or list: a pre-parsed node, used directly.
-                - File or directory path: passed to `_load_file()`.
-                - Version string (e.g. 'v1', 'current'): resolves a file
-                  or directory named DICTIONARY_FILENAME (if any) inside
-                  the `DICTIONARY_MODULE.<source>` package, then passes
-                  it to `_load_file()`.
-            document (dict or list, optional):
-                The root node of the parent document this instance was
-                constructed as an item of, if any -- see the module
-                docstring's "Cross-document resolution" section. Exposed
-                unchanged as `.document`. Defaults to this instance's own
-                node: a `TreeSemanticDictionary` instantiated directly
-                (rather than constructed as an item by another
-                `TreeSemanticDictionary`'s `__getitem__`/`__iter__`) is
-                its own document, which is exactly what makes
-                single-node resolution (an item resolving attributes
-                against only its own node) the unchanged default for
-                classes that never opt into cross-document resolution.
-
-        Raises:
-            ValueError: If source is None, or if resolving a version
-                string is attempted without DICTIONARY_MODULE set.
-            FileNotFoundError: If a version string or file path fails to
-                resolve.
-        """
-        if source is None:
-            raise ValueError(
-                f"Must explicitly specify a version (e.g., {self.__class__.__name__}('v1') "
-                f"or {self.__class__.__name__}('current')), a file/directory path, or a "
-                f"pre-parsed node (dict/list)."
-            )
-
+    def _load_source(self, source):
         if isinstance(source, (dict, list)):
-            self.node = source
-            self.document = document if document is not None else self.node
-            return
+            return source
 
         source_str = str(source)
 
         if os.path.exists(source_str):
-            self.node = self._load_file(source_str)
-            self.document = document if document is not None else self.node
-            return
+            return self._load_file(source_str)
 
         if not self.DICTIONARY_MODULE:
             raise ValueError(
@@ -250,27 +166,18 @@ class TreeSemanticDictionary:
             with as_file(traversable_path) as resolved_path:
                 if not resolved_path.exists():
                     raise FileNotFoundError(f"Package '{package_target}' does not exist.")
-                self.node = self._load_file(str(resolved_path))
+                return self._load_file(str(resolved_path))
         except Exception as e:
             raise FileNotFoundError(
                 f"Failed to resolve version '{source_str}' for {self.__class__.__name__} "
                 f"in '{package_target}': {e}"
             )
-        self.document = document if document is not None else self.node
 
     @classmethod
     def _load_file(cls, path):
         """
         Turn a resolved file or directory path into this dictionary's
         node.
-
-        Autodetects plain JSON and plain YAML by extension -- this covers
-        any dict/list format with no format-specific loading quirks of
-        its own (e.g. F-Prime's JSON topology dictionaries). Formats that
-        need something more (AIT-flavored YAML's `!include` resolution,
-        say) should override this method entirely rather than fight it;
-        see `tts_dictionary_interface.ait.AitYamlDictionary` for an
-        example.
         """
         if os.path.isdir(path):
             if not cls.DICTIONARY_FILENAME:
@@ -291,73 +198,19 @@ class TreeSemanticDictionary:
             f"'{extension}'. Override _load_file() to support this format."
         )
 
+    def select(self, path, filters=None):
+        """
+        Resolve a path against a dict/list tree.
+        """
+        if filters:
+            # For TreeSemanticDictionary, we append the filter to the path.
+            # Note: we use ' and ' as per the original implementation, 
+            # but BaseSemanticDictionary calls select() in a loop for OR.
+            filter_str = ' and '.join(f'{attr.strip()}="{val}"' for attr, val in filters.items())
+            path = f"{path}[{filter_str}]"
+        
+        return select(self.node, path)
+
     def path(self, path):
         """Run a raw path query against this node. See module docstring."""
         return select(self.node, path)
-
-    def __getattr__(self, attr):
-        if attr not in self.ATTR_PATHS:
-            raise AttributeError(
-                f"'{self.__class__.__name__}' object has no attribute '{attr}'"
-            )
-
-        config = self.ATTR_PATHS[attr]
-        path_str = config[0]
-        attr_class = config[1] if len(config) > 1 else None
-        return_list = config[2] if len(config) > 2 else False
-
-        matches = select(self.node, path_str)
-
-        def resolve(value):
-            if attr_class is None:
-                return value
-            if _accepts_document_arg(attr_class):
-                return attr_class(value, self)
-            return attr_class(value)
-
-        if len(matches) == 0:
-            if return_list:
-                return []
-            raise DictionaryAttributeError(
-                f"'{self.__class__.__name__}' object has no value for "
-                f"attribute '{attr}' (path '{path_str}' matched zero elements)"
-            )
-
-        if return_list:
-            return [resolve(m) for m in matches]
-        return resolve(matches[0])
-
-    def __getitem__(self, item):
-        elements = []
-        paths = []
-        for itempath, itemid, itemclass in zip(self.ITEM_PATHS, self.ITEM_HUMAN_UNIQUE_IDS, self.ITEM_CLASSES):
-            conditions = ' and '.join(f'{attr.strip()}="{item}"' for attr in itemid.split('|'))
-            full_path = f'{itempath}[{conditions}]'
-            paths.append(full_path)
-            elements += [itemclass(x, document=self.document) for x in select(self.node, full_path)]
-
-        if len(elements) == 0:
-            raise KeyError(f'No elements found with value "{item}" on path(s): {paths}')
-        if len(elements) > 1:
-            raise KeyError(f'More than one element found with value "{item}" on path(s): {paths}')
-        return elements[0]
-
-    def __iter__(self):
-        elements = []
-        for itempath, itemclass in zip(self.ITEM_PATHS, self.ITEM_CLASSES):
-            elements += [itemclass(x, document=self.document) for x in select(self.node, itempath)]
-        for e in elements:
-            yield e
-
-    def __len__(self):
-        # A list comprehension, not list(self) -- list() calls len() as a
-        # sizing hint before iterating, which would recurse right back
-        # into this method.
-        return len([x for x in self])
-
-    def __contains__(self, key):
-        for itempath, itemid in zip(self.ITEM_PATHS, self.ITEM_HUMAN_UNIQUE_IDS):
-            conditions = ' and '.join(f'{attr.strip()}="{key}"' for attr in itemid.split('|'))
-            if select(self.node, f'{itempath}[{conditions}]'):
-                return True
-        return False
