@@ -5,7 +5,7 @@ Welcome to the Teamtools Starter Template documentation!
    :maxdepth: 2
    :caption: Contents:
 
-   foo
+   narrative
 
 Indices and tables
 ==================
