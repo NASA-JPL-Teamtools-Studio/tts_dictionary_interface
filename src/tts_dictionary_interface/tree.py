@@ -121,8 +121,10 @@ def _descend_one(node, key):
 
 def select(node, path):
     """
-    Resolve a path (see module docstring) against a dict/list tree,
-    always returning a list of matches.
+    Resolve a path against a dict/list tree and return matching nodes.
+
+    The path language is described in the module docstring. The result
+    is always a list, even for zero or one matches.
     """
     current = _flatten([node])
     for segment in [s for s in path.split('/') if s != '']:
@@ -175,10 +177,11 @@ def _accepts_document_arg(func):
 
 class TreeSemanticDictionary:
     """
-    The dict/list-tree analog of `SemanticDictionary`. See module
-    docstring for the path language, and `SemanticDictionary` for the
-    concepts (`ATTR_PATHS`/`ITEM_PATHS`/`ITEM_CLASSES`/
-    `ITEM_HUMAN_UNIQUE_IDS`) this mirrors.
+    The dict/list-tree analog of SemanticDictionary.
+
+    See the module docstring for the path language and for the concepts
+    (`ATTR_PATHS`/`ITEM_PATHS`/`ITEM_CLASSES`/`ITEM_HUMAN_UNIQUE_IDS`)
+    that this class mirrors.
     """
     ITEM_PATHS = []
     ITEM_HUMAN_UNIQUE_IDS = []
@@ -192,6 +195,8 @@ class TreeSemanticDictionary:
 
     def __init__(self, source=None, document=None):
         """
+        Initialize the TreeSemanticDictionary from a source node or path.
+
         Args:
             source (dict, list, str, or os.PathLike):
                 - dict or list: a pre-parsed node, used directly.
@@ -296,6 +301,12 @@ class TreeSemanticDictionary:
         return select(self.node, path)
 
     def __getattr__(self, attr):
+        """
+        Retrieve a dynamic attribute defined in ATTR_PATHS.
+
+        The attribute is resolved by selecting nodes using the configured
+        path and optionally transforming them with the configured callable.
+        """
         if attr not in self.ATTR_PATHS:
             raise AttributeError(
                 f"'{self.__class__.__name__}' object has no attribute '{attr}'"
@@ -328,6 +339,12 @@ class TreeSemanticDictionary:
         return resolve(matches[0])
 
     def __getitem__(self, item):
+        """
+        Retrieve a specific item by its unique identifier.
+
+        The method searches ITEM_PATHS using the identifier and returns
+        the first matching item wrapped in its ITEM_CLASS.
+        """
         elements = []
         paths = []
         for itempath, itemid, itemclass in zip(self.ITEM_PATHS, self.ITEM_HUMAN_UNIQUE_IDS, self.ITEM_CLASSES):
@@ -343,6 +360,12 @@ class TreeSemanticDictionary:
         return elements[0]
 
     def __iter__(self):
+        """
+        Iterate over all items configured in ITEM_PATHS.
+
+        Items are wrapped in their respective ITEM_CLASSES and yielded
+        one at a time.
+        """
         elements = []
         for itempath, itemclass in zip(self.ITEM_PATHS, self.ITEM_CLASSES):
             elements += [itemclass(x, document=self.document) for x in select(self.node, itempath)]
@@ -350,12 +373,22 @@ class TreeSemanticDictionary:
             yield e
 
     def __len__(self):
+        """
+        Return the number of items in this dictionary.
+
+        The count is obtained by iterating over the configured ITEM_PATHS.
+        """
         # A list comprehension, not list(self) -- list() calls len() as a
         # sizing hint before iterating, which would recurse right back
         # into this method.
         return len([x for x in self])
 
     def __contains__(self, key):
+        """
+        Check if an item with the given key exists in this dictionary.
+
+        The method tests ITEM_PATHS for a matching identifier.
+        """
         for itempath, itemid in zip(self.ITEM_PATHS, self.ITEM_HUMAN_UNIQUE_IDS):
             conditions = ' and '.join(f'{attr.strip()}="{key}"' for attr in itemid.split('|'))
             if select(self.node, f'{itempath}[{conditions}]'):
