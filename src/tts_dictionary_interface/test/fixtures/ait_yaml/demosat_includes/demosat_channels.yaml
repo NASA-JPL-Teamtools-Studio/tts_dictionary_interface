@@ -1,0 +1,16 @@
+- !Packet
+  name: DEMOSAT_HK
+  fields:
+    - !Field
+      name: battery_voltage
+      desc: Battery bus voltage
+      bytes: [2, 3]
+      type: MSB_U16
+      units: Volts
+    - !Field
+      name: heater_state
+      bytes: 4
+      type: U8
+      enum:
+        0: 'OFF'
+        1: 'ON'

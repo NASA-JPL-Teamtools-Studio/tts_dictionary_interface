@@ -1,0 +1,10 @@
+- !Packet
+  name: LEAF_LEVEL_PACKET
+  fields:
+    - !Field
+      name: leaf_field
+      bytes: 2
+      type: U8
+      enum:
+        0: 'OFF'
+        1: 'ON'

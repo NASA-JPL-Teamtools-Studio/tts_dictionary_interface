@@ -1,0 +1,8 @@
+- !Packet
+  name: CCSDS_HEADER
+  fields:
+    - !Field
+      name: apid
+      bytes: [0, 1]
+      type: MSB_U16
+      mask: 0x07FF

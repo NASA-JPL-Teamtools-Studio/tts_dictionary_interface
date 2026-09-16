@@ -1,0 +1,2 @@
+- !include ccsds_header.yaml
+- !include demosat_channels.yaml
