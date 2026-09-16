@@ -39,9 +39,9 @@ def _resolve_required(instance, name):
     1. If the concrete class exposes a declarative attribute-config dict
        (e.g. AMPCS's SemanticDictionary subclasses' ATTR_XPATHS, or the
        dict/list-tree analog ATTR_PATHS used by YAML/AIT-flavored
-       engines) and the attribute isn't a key in it, the attribute is
-       definitely not implemented -- raise NotImplementedError without
-       even trying, since the dynamic __getattr__ would otherwise
+       engines) and the attribute isn't a key in ANY of them, the
+       attribute is definitely not implemented -- raise NotImplementedError
+       without even trying, since the dynamic __getattr__ would otherwise
        silently fall back to a raw attribute lookup and return None
        instead of signaling "unimplemented".
     2. Otherwise, if the concrete class defines a real __getattr__, try it
@@ -50,9 +50,10 @@ def _resolve_required(instance, name):
        -- or there's no __getattr__ to try at all -- the attribute is not
        implemented; raise NotImplementedError.
     """
-    for declarative_config_attr in ('ATTR_XPATHS', 'ATTR_PATHS'):
-        config = getattr(type(instance), declarative_config_attr, None)
-        if config is not None and name not in config:
+    attr_paths = getattr(type(instance), 'ATTR_PATHS', None) or {}
+    attr_xpaths = getattr(type(instance), 'ATTR_XPATHS', None) or {}
+    if attr_paths or attr_xpaths:
+        if name not in attr_paths and name not in attr_xpaths:
             raise NotImplementedError(
                 f"{type(instance).__name__} does not implement required "
                 f"contract attribute '{name}'"

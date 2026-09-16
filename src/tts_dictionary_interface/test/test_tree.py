@@ -4,6 +4,7 @@ import os
 import pytest
 
 from tts_dictionary_interface.contracts import ChannelContract, EvrContract
+from tts_dictionary_interface.base import _accepts_document_arg
 from tts_dictionary_interface.tree import TreeSemanticDictionary, select
 
 pytestmark = pytest.mark.unreviewed_ai

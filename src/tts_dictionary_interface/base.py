@@ -86,10 +86,13 @@ class BaseSemanticDictionary:
             return attr_class(value, item_instance)
         return attr_class(value)
 
+    def _effective_item_paths(self):
+        """Return ITEM_PATHS if non-empty, else fall back to legacy ITEM_XPATHS."""
+        return getattr(type(self), 'ITEM_PATHS', None) or getattr(type(self), 'ITEM_XPATHS', [])
+
     def __getitem__(self, item):
         elements = []
-        # Support both ITEM_PATHS and ITEM_XPATHS from the class
-        item_paths = getattr(type(self), 'ITEM_PATHS', getattr(type(self), 'ITEM_XPATHS', []))
+        item_paths = self._effective_item_paths()
         item_ids = getattr(type(self), 'ITEM_HUMAN_UNIQUE_IDS', [])
         item_classes = getattr(type(self), 'ITEM_CLASSES', [])
         
@@ -117,22 +120,34 @@ class BaseSemanticDictionary:
         return unique_elements[0]
 
     def __getattr__(self, attr):
-        # Support both ATTR_PATHS and ATTR_XPATHS from the class
-        attr_configs = getattr(type(self), 'ATTR_PATHS', getattr(type(self), 'ATTR_XPATHS', {}))
-        if attr not in attr_configs:
-            # For XML, we might want to fall back to .get(attr)
-            if hasattr(self.node, 'get') and attr in self.node:
-                return self.node.get(attr)
-            raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{attr}'")
-
-        config = attr_configs[attr]
-        path = config[0]
-        attr_class = config[1] if len(config) > 1 else None
-        return_list = config[2] if len(config) > 2 else False
+        # Try ATTR_PATHS (new 3-tuple: path, attr_class, return_list) first,
+        # then fall back to legacy ATTR_XPATHS (4-tuple: xpath, is_text, attr_class, return_list).
+        attr_paths = getattr(type(self), 'ATTR_PATHS', None)
+        if attr_paths and attr in attr_paths:
+            config = attr_paths[attr]
+            path = config[0]
+            attr_class = config[1] if len(config) > 1 else None
+            return_list = config[2] if len(config) > 2 else False
+            is_text = False
+        else:
+            attr_xpaths = getattr(type(self), 'ATTR_XPATHS', None)
+            if not attr_xpaths or attr not in attr_xpaths:
+                # Fall back to root XML attribute (returns None if not present,
+                # matching the legacy SemanticDictionary behavior)
+                if hasattr(self.node, 'get'):
+                    return self.node.get(attr)
+                raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{attr}'")
+            config = attr_xpaths[attr]
+            path = config[0]
+            is_text = config[1] if len(config) > 1 else False
+            attr_class = config[2] if len(config) > 2 else None
+            return_list = config[3] if len(config) > 3 else False
 
         matches = self.select(path)
         
         def resolve(m):
+            if is_text and hasattr(m, 'text'):
+                m = m.text
             return self.resolve_attr_value(m, attr_class, self)
 
         if not matches:
@@ -147,7 +162,7 @@ class BaseSemanticDictionary:
     def __iter__(self):
         elements = []
         # Use type(self) to avoid triggering __getattr__
-        item_paths = getattr(type(self), 'ITEM_PATHS', getattr(type(self), 'ITEM_XPATHS', []))
+        item_paths = self._effective_item_paths()
         item_classes = getattr(type(self), 'ITEM_CLASSES', [])
         for path, itemclass in zip(item_paths, item_classes):
             matches = self.select(path)
@@ -159,7 +174,8 @@ class BaseSemanticDictionary:
         return sum(1 for _ in self)
 
     def __contains__(self, key):
-        for path, id_spec in zip(self.ITEM_PATHS, self.ITEM_HUMAN_UNIQUE_IDS):
+        item_paths = self._effective_item_paths()
+        for path, id_spec in zip(item_paths, self.ITEM_HUMAN_UNIQUE_IDS):
             identifiers = [id_.strip() for id_ in id_spec.split('|')]
             for id_attr in identifiers:
                 if self.select(path, {id_attr: key}):
@@ -173,6 +189,13 @@ class XMLSemanticDictionary(BaseSemanticDictionary):
     @property
     def etree(self):
         return self.node
+
+    def xpath(self, xpath):
+        """
+        Run a raw XPath query against the root element of the dictionary.
+        A passthrough to ``self.node.xpath()``.
+        """
+        return self.node.xpath(xpath)
 
     def _load_source(self, source):
         if not isinstance(source, (str, os.PathLike)):

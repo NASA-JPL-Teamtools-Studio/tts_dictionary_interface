@@ -44,7 +44,7 @@ def sample_xml():
 
 class CommandWrapper:
     """A dummy wrapper class to test ITEM_CLASSES instantiation."""
-    def __init__(self, element):
+    def __init__(self, element, document=None):
         self.element = element
         self.stem = element.get('stem')
 
