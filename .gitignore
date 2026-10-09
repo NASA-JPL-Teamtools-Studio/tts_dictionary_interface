@@ -186,3 +186,6 @@ Thumbs.db
 
 #nfs temp files
 .nfs*
+
+#other
+tmp_dict_examples/
