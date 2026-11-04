@@ -67,6 +67,7 @@ class BaseSemanticDictionary:
         # we are passed the root of that dictionary.
         self.document = document if document is not None else self.node
         self._cache = OrderedDict()
+        self._node_cache = OrderedDict()
         self._item_count = None
 
     _CACHE_MISS = object()
@@ -84,6 +85,21 @@ class BaseSemanticDictionary:
             self._cache.popitem(last=False)
         return value
 
+    def _node_cache_get(self, node):
+        key = id(node)
+        value = self._node_cache.get(key, self._CACHE_MISS)
+        if value is not self._CACHE_MISS:
+            self._node_cache.move_to_end(key)
+        return value
+
+    def _node_cache_put(self, node, value):
+        key = id(node)
+        self._node_cache[key] = value
+        self._node_cache.move_to_end(key)
+        while len(self._node_cache) > self.CACHE_CAPACITY:
+            self._node_cache.popitem(last=False)
+        return value
+
     def _item_cache_key(self, node, id_spec):
         for identifier in id_spec.split('|'):
             identifier = identifier.strip()
@@ -97,23 +113,29 @@ class BaseSemanticDictionary:
                 return ('getitem', value)
         return None
 
-    def _wrap_item(self, node, itemclass, id_spec=None):
-        key = self._item_cache_key(node, id_spec) if id_spec else None
-        if key is not None:
-            cached = self._cache_get(key)
+    def _wrap_item(self, node, itemclass, id_spec=None, lookup_key=None):
+        if lookup_key is not None:
+            cached = self._cache_get(('getitem', lookup_key))
             if cached is not self._CACHE_MISS:
                 return cached
-        item = itemclass(node, document=self.document)
-        if key is not None:
-            existing = self._cache.get(key, self._CACHE_MISS)
-            if existing is self._CACHE_MISS or existing is item:
-                self._cache_put(key, item)
-            elif getattr(existing, 'node', existing) is getattr(item, 'node', item):
-                self._cache_put(key, existing)
-            else:
-                # An identifier shared by multiple nodes is ambiguous and
-                # must remain discoverable by __getitem__.
-                self._cache.pop(key, None)
+
+        item = self._node_cache_get(node)
+        if item is self._CACHE_MISS:
+            item = itemclass(node, document=self.document)
+            self._node_cache_put(node, item)
+
+        if lookup_key is not None:
+            self._cache_put(('getitem', lookup_key), item)
+        else:
+            key = self._item_cache_key(node, id_spec) if id_spec else None
+            if key is not None:
+                existing = self._cache.get(key, self._CACHE_MISS)
+                if existing is self._CACHE_MISS:
+                    self._cache_put(key, item)
+                elif getattr(existing, 'node', existing) is not getattr(item, 'node', item):
+                    # An identifier shared by multiple nodes is ambiguous and
+                    # must remain discoverable by __getitem__.
+                    self._cache.pop(key, None)
         return item
 
     def _load_source(self, source):
@@ -173,7 +195,7 @@ class BaseSemanticDictionary:
             raise KeyError(f'More than one element found with value "{item}"')
         
         node, itemclass, id_spec = unique_elements[0]
-        return self._wrap_item(node, itemclass, id_spec)
+        return self._wrap_item(node, itemclass, id_spec, lookup_key=item)
 
     def __getattr__(self, attr):
         cached = self._cache_get(('getattr', attr))
@@ -223,21 +245,18 @@ class BaseSemanticDictionary:
         return self._cache_put(('getattr', attr), value)
 
     def __iter__(self):
-        elements = []
         # Use type(self) to avoid triggering __getattr__
         item_paths = self._effective_item_paths()
         item_classes = getattr(type(self), 'ITEM_CLASSES', [])
         item_ids = getattr(type(self), 'ITEM_HUMAN_UNIQUE_IDS', [])
+        count = 0
         for index, (path, itemclass) in enumerate(zip(item_paths, item_classes)):
             id_spec = item_ids[index] if index < len(item_ids) else None
             matches = self.select(path)
-            elements.extend([
-                self._wrap_item(node, itemclass, id_spec)
-                for node in matches
-            ])
-        self._item_count = len(elements)
-        for e in elements:
-            yield e
+            for node in matches:
+                count += 1
+                yield self._wrap_item(node, itemclass, id_spec)
+        self._item_count = count
 
     def __len__(self):
         if self._item_count is None:
@@ -259,7 +278,7 @@ class BaseSemanticDictionary:
                 matches = self.select(path, {id_attr: key})
                 if matches:
                     if len(matches) == 1:
-                        self._wrap_item(matches[0], itemclass, id_spec)
+                        self._wrap_item(matches[0], itemclass, id_spec, lookup_key=key)
                     # Preserve the existing boolean semantics for ambiguous
                     # identifiers; __getitem__ remains responsible for
                     # rejecting multiple matches.

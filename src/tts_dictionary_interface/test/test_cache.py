@@ -32,6 +32,23 @@ def test_xml_contains_populates_the_same_item_cache():
     assert document['one'] is first
 
 
+def test_xml_alternate_identifier_reuses_the_wrapped_node():
+    class XMLItem(SemanticDictionary):
+        pass
+
+    class XMLDocument(SemanticDictionary):
+        ITEM_XPATHS = ['.//Item']
+        ITEM_HUMAN_UNIQUE_IDS = ['name|opcode']
+        ITEM_CLASSES = [XMLItem]
+
+    document = XMLDocument(
+        etree.fromstring(b'<Root><Item name="one" opcode="0x1"/></Root>')
+    )
+
+    first = document['one']
+    assert document['0x1'] is first
+
+
 def test_xml_getattr_caches_resolved_values():
     calls = []
 
@@ -104,6 +121,24 @@ def test_iteration_reuses_wrapped_items_and_len_is_not_lru_size():
     large_document = CachedDocument([{'name': str(i)} for i in range(101)])
     list(large_document)
     assert len(large_document) == 101
+
+
+def test_iteration_wraps_items_as_the_iterator_advances():
+    class CountingDocument(CachedDocument):
+        def __init__(self, source):
+            super().__init__(source)
+            self.selected = 0
+
+        def select(self, path, filters=None):
+            self.selected += 1
+            return super().select(path, filters)
+
+    document = CountingDocument([{'name': str(i)} for i in range(3)])
+    iterator = iter(document)
+
+    assert document.selected == 0
+    next(iterator)
+    assert document.selected == 1
 
 
 def test_lru_eviction_rebuilds_the_oldest_item():
