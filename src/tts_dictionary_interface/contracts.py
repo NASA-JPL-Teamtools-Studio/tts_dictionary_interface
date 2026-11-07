@@ -39,9 +39,9 @@ def _resolve_required(instance, name):
     1. If the concrete class exposes a declarative attribute-config dict
        (e.g. AMPCS's SemanticDictionary subclasses' ATTR_XPATHS, or the
        dict/list-tree analog ATTR_PATHS used by YAML/AIT-flavored
-       engines) and the attribute isn't a key in it, the attribute is
-       definitely not implemented -- raise NotImplementedError without
-       even trying, since the dynamic __getattr__ would otherwise
+       engines) and the attribute isn't a key in ANY of them, the
+       attribute is definitely not implemented -- raise NotImplementedError
+       without even trying, since the dynamic __getattr__ would otherwise
        silently fall back to a raw attribute lookup and return None
        instead of signaling "unimplemented".
     2. Otherwise, if the concrete class defines a real __getattr__, try it
@@ -50,9 +50,10 @@ def _resolve_required(instance, name):
        -- or there's no __getattr__ to try at all -- the attribute is not
        implemented; raise NotImplementedError.
     """
-    for declarative_config_attr in ('ATTR_XPATHS', 'ATTR_PATHS'):
-        config = getattr(type(instance), declarative_config_attr, None)
-        if config is not None and name not in config:
+    attr_paths = getattr(type(instance), 'ATTR_PATHS', None) or {}
+    attr_xpaths = getattr(type(instance), 'ATTR_XPATHS', None) or {}
+    if attr_paths or attr_xpaths:
+        if name not in attr_paths and name not in attr_xpaths:
             raise NotImplementedError(
                 f"{type(instance).__name__} does not implement required "
                 f"contract attribute '{name}'"
@@ -126,6 +127,18 @@ class ArgumentContract:
         """Return the maximum value if defined."""
         return _resolve_optional(self, 'max')
 
+    @property
+    def type(self):
+        return _resolve_optional(self, 'type')
+
+    @property
+    def description(self):
+        return _resolve_optional(self, 'description')
+
+    @property
+    def enum(self):
+        return _resolve_optional(self, 'enum')
+
 
 class CommandContract:
     """
@@ -198,6 +211,111 @@ class ChannelContract:
     def measurement_id(self):
         """Return the measurement ID if defined."""
         return _resolve_optional(self, 'measurement_id')
+
+
+class ApidContract:
+    """
+    Contract for an application packet identifier definition.
+
+    Required: apid, name, format, title, description, module, opscat.
+    Optional: recorded, downlink_info.
+    """
+
+    @property
+    def apid(self):
+        return _resolve_required(self, 'apid')
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def format(self):
+        return _resolve_required(self, 'format')
+
+    @property
+    def title(self):
+        return _resolve_required(self, 'title')
+
+    @property
+    def description(self):
+        return _resolve_required(self, 'description')
+
+    @property
+    def module(self):
+        return _resolve_required(self, 'module')
+
+    @property
+    def opscat(self):
+        return _resolve_required(self, 'opscat')
+
+    @property
+    def recorded(self):
+        return _resolve_optional(self, 'recorded')
+
+    @property
+    def downlink_info(self):
+        return _resolve_optional(self, 'downlink_info')
+
+
+class EvrArgumentContract:
+    """
+    Contract for an argument interpolated into an EVR message.
+
+    Required: name.
+    Optional: type, length, enum.
+
+    EVR arguments are deliberately separate from command arguments because
+    their metadata describes message interpolation, not command encoding.
+    """
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def type(self):
+        return _resolve_optional(self, 'type')
+
+    @property
+    def length(self):
+        return _resolve_optional(self, 'length')
+
+    @property
+    def enum(self):
+        return _resolve_optional(self, 'enum')
+
+
+class EnumTableContract:
+    """
+    Contract for a named enumeration table.
+
+    Required: name, values.
+    """
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def values(self):
+        return _resolve_required(self, 'values')
+
+
+class EnumValueContract:
+    """
+    Contract for one value in an enumeration table.
+
+    Required: name, value.
+    """
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def value(self):
+        return _resolve_required(self, 'value')
 
 
 class EvrContract:
