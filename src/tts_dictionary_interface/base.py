@@ -16,12 +16,12 @@ logger = create_logger('semantic_dictionary')
 
 class DictionaryAttributeError(AttributeError):
     """
-    Raised when a single-valued attribute configured in ATTR_XPATHS resolves
-    to zero elements against the underlying dictionary.
+    Raised when a single-valued attribute resolves to zero elements.
 
-    Subclasses AttributeError so hasattr() and getattr(obj, name, default)
-    remain valid, intentional ways to probe attributes that are legitimately
-    optional for a given item.
+    The error is raised when an attribute configured in ATTR_XPATHS resolves
+    to zero elements against the underlying dictionary. Subclasses AttributeError
+    so hasattr() and getattr(obj, name, default) remain valid ways to probe
+    attributes that are legitimately optional for a given item.
     """
     pass
 
@@ -141,9 +141,10 @@ class SemanticDictionary:
 
     def xpath(self, xpath):
         """
-        Run a raw XPath query against the root element of this dictionary. Literally just
-        a passthrough of etree.xpath so you can get to any part of the XML you want below
-        this node.
+        Run a raw XPath query against the root element of this dictionary.
+
+        This is a passthrough of etree.xpath so you can get to any part of the
+        XML you want below this node.
 
         Args:
             xpath (str): The XPath query string to execute.
@@ -280,6 +281,12 @@ class SemanticDictionary:
         for e in elements: yield e
 
     def __len__(self):
+        """
+        Return the number of items in this dictionary.
+
+        The count is derived by iterating over the configured ITEM_XPATHS
+        and wrapping each element in its ITEM_CLASS.
+        """
         # Return the number of items in the members list
         return len([x for x in self])
 

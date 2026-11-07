@@ -103,22 +103,27 @@ class ArgumentContract:
 
     @property
     def name(self):
+        """Return the argument name."""
         return _resolve_required(self, 'name')
 
     @property
     def length(self):
+        """Return the argument length."""
         return _resolve_required(self, 'length')
 
     @property
     def units(self):
+        """Return the argument units if defined."""
         return _resolve_optional(self, 'units')
 
     @property
     def min(self):
+        """Return the minimum value if defined."""
         return _resolve_optional(self, 'min')
 
     @property
     def max(self):
+        """Return the maximum value if defined."""
         return _resolve_optional(self, 'max')
 
 
@@ -133,18 +138,22 @@ class CommandContract:
 
     @property
     def stem(self):
+        """Return the command stem."""
         return _resolve_required(self, 'stem')
 
     @property
     def opcode(self):
+        """Return the command opcode."""
         return _resolve_required(self, 'opcode')
 
     @property
     def opscat(self):
+        """Return the command opscat."""
         return _resolve_required(self, 'opscat')
 
     @property
     def args(self):
+        """Return the command arguments."""
         return _resolve_required(self, 'args')
 
 
@@ -162,26 +171,32 @@ class ChannelContract:
 
     @property
     def channel_id(self):
+        """Return the channel ID."""
         return _resolve_required(self, 'channel_id')
 
     @property
     def channel_name(self):
+        """Return the channel name."""
         return _resolve_required(self, 'channel_name')
 
     @property
     def opscat(self):
+        """Return the channel opscat."""
         return _resolve_required(self, 'opscat')
 
     @property
     def type(self):
+        """Return the channel type."""
         return _resolve_required(self, 'type')
 
     @property
     def module(self):
+        """Return the channel module if defined."""
         return _resolve_optional(self, 'module')
 
     @property
     def measurement_id(self):
+        """Return the measurement ID if defined."""
         return _resolve_optional(self, 'measurement_id')
 
 
@@ -204,12 +219,15 @@ class EvrContract:
 
     @property
     def name(self):
+        """Return the EVR name."""
         return _resolve_required(self, 'name')
 
     @property
     def message(self):
+        """Return the EVR message template."""
         return _resolve_required(self, 'message')
 
     @property
     def severity(self):
+        """Return the EVR severity."""
         return _resolve_required(self, 'severity')
