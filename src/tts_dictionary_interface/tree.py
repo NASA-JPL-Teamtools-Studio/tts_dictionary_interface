@@ -29,7 +29,34 @@ Path language (deliberately small, mirrors the subset of XPath that
 Every step, and the path as a whole, always resolves to a list, exactly
 like XPath -- callers can't tell from the return type alone whether zero,
 one, or many things matched.
+
+Cross-document resolution:
+
+    An item constructed by `TreeSemanticDictionary.__getitem__`/
+    `__iter__` is handed a `.document` attribute -- the root node of the
+    top-level document it was ultimately constructed from, regardless of
+    how many `ITEM_PATHS` levels deep it was nested. This is what lets an
+    `ATTR_PATHS` value-transform callable resolve a query against some
+    *other* top-level section of the document, not just the node it
+    itself was matched from -- the general primitive any "type table" /
+    "lookup table" tree format needs (e.g. F-Prime's per-field `type`
+    indirecting into a separate top-level `typeDefinitions` array by
+    `qualifiedName`, rather than embedding the full type definition
+    inline).
+
+    Calling convention: an `ATTR_PATHS` entry's value-transform callable
+    (`config[1]`, historically written as a single-argument
+    `lambda node: ...`) may optionally accept a second positional
+    argument -- the constructed item itself (`self`) -- in which case
+    it's called as `func(value, item)` instead of `func(value)`. Use
+    `item.document` inside the callable to run a fresh `select()` (or any
+    other lookup) against the whole document. Whether a given callable
+    opts in is detected automatically via `_accepts_document_arg`
+    (signature introspection) -- no explicit flag is needed in
+    `ATTR_PATHS` itself, and every pre-existing single-argument callable
+    keeps working completely unchanged.
 """
+import inspect
 import json
 import os
 import re
@@ -110,6 +137,42 @@ def select(node, path):
     return current
 
 
+def _accepts_document_arg(func):
+    """
+    Whether `func` (an `ATTR_PATHS` value-transform callable -- the
+    second element of an `ATTR_PATHS` config tuple, `config[1]`) is
+    written to accept a second positional argument -- the constructed
+    item itself, which exposes `.document` -- in addition to the matched
+    value it's always called with.
+
+    This is what lets `ATTR_PATHS` configs opt into cross-document
+    resolution (see the module docstring and
+    `TreeSemanticDictionary.__getattr__`) while every existing
+    single-argument `lambda node: ...` callable keeps working completely
+    unchanged: this only ever adds a second argument to the call, never
+    removes the first.
+
+    Deliberately permissive about what `func` is (a plain function, a
+    lambda, a class, a builtin, ...) -- anything whose signature can't be
+    introspected (e.g. many builtins) is assumed to be single-argument,
+    which is the safe, backward-compatible default.
+    """
+    try:
+        signature = inspect.signature(func)
+    except (TypeError, ValueError):
+        return False
+
+    parameters = list(signature.parameters.values())
+    if any(p.kind == inspect.Parameter.VAR_POSITIONAL for p in parameters):
+        return True
+
+    positional = [
+        p for p in parameters
+        if p.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    ]
+    return len(positional) >= 2
+
+
 class TreeSemanticDictionary:
     """
     The dict/list-tree analog of `SemanticDictionary`. See module
@@ -127,7 +190,7 @@ class TreeSemanticDictionary:
     DICTIONARY_MODULE = None
     DICTIONARY_FILENAME = None
 
-    def __init__(self, source=None):
+    def __init__(self, source=None, document=None):
         """
         Args:
             source (dict, list, str, or os.PathLike):
@@ -137,6 +200,18 @@ class TreeSemanticDictionary:
                   or directory named DICTIONARY_FILENAME (if any) inside
                   the `DICTIONARY_MODULE.<source>` package, then passes
                   it to `_load_file()`.
+            document (dict or list, optional):
+                The root node of the parent document this instance was
+                constructed as an item of, if any -- see the module
+                docstring's "Cross-document resolution" section. Exposed
+                unchanged as `.document`. Defaults to this instance's own
+                node: a `TreeSemanticDictionary` instantiated directly
+                (rather than constructed as an item by another
+                `TreeSemanticDictionary`'s `__getitem__`/`__iter__`) is
+                its own document, which is exactly what makes
+                single-node resolution (an item resolving attributes
+                against only its own node) the unchanged default for
+                classes that never opt into cross-document resolution.
 
         Raises:
             ValueError: If source is None, or if resolving a version
@@ -153,12 +228,14 @@ class TreeSemanticDictionary:
 
         if isinstance(source, (dict, list)):
             self.node = source
+            self.document = document if document is not None else self.node
             return
 
         source_str = str(source)
 
         if os.path.exists(source_str):
             self.node = self._load_file(source_str)
+            self.document = document if document is not None else self.node
             return
 
         if not self.DICTIONARY_MODULE:
@@ -179,6 +256,7 @@ class TreeSemanticDictionary:
                 f"Failed to resolve version '{source_str}' for {self.__class__.__name__} "
                 f"in '{package_target}': {e}"
             )
+        self.document = document if document is not None else self.node
 
     @classmethod
     def _load_file(cls, path):
@@ -231,7 +309,11 @@ class TreeSemanticDictionary:
         matches = select(self.node, path_str)
 
         def resolve(value):
-            return attr_class(value) if attr_class is not None else value
+            if attr_class is None:
+                return value
+            if _accepts_document_arg(attr_class):
+                return attr_class(value, self)
+            return attr_class(value)
 
         if len(matches) == 0:
             if return_list:
@@ -252,7 +334,7 @@ class TreeSemanticDictionary:
             conditions = ' and '.join(f'{attr.strip()}="{item}"' for attr in itemid.split('|'))
             full_path = f'{itempath}[{conditions}]'
             paths.append(full_path)
-            elements += [itemclass(x) for x in select(self.node, full_path)]
+            elements += [itemclass(x, document=self.document) for x in select(self.node, full_path)]
 
         if len(elements) == 0:
             raise KeyError(f'No elements found with value "{item}" on path(s): {paths}')
@@ -263,7 +345,7 @@ class TreeSemanticDictionary:
     def __iter__(self):
         elements = []
         for itempath, itemclass in zip(self.ITEM_PATHS, self.ITEM_CLASSES):
-            elements += [itemclass(x) for x in select(self.node, itempath)]
+            elements += [itemclass(x, document=self.document) for x in select(self.node, itempath)]
         for e in elements:
             yield e
 
