@@ -9,9 +9,13 @@ from lxml import etree
 
 from tts_dictionary_interface.base import SemanticDictionary
 from tts_dictionary_interface.contracts import (
+    ApidContract,
     ChannelContract,
     CommandContract,
     ArgumentContract,
+    EnumTableContract,
+    EnumValueContract,
+    EvrArgumentContract,
     EvrContract,
 )
 
@@ -165,3 +169,122 @@ def test_incomplete_evr_raises_only_for_missing_attrs():
         evr.message
     with pytest.raises(NotImplementedError):
         evr.severity
+
+
+class CompleteApid(ApidContract):
+    @property
+    def apid(self):
+        return 42
+
+    @property
+    def name(self):
+        return 'CORE'
+
+    @property
+    def format(self):
+        return '0x%04X'
+
+    @property
+    def title(self):
+        return 'Core packet'
+
+    @property
+    def description(self):
+        return 'Core application packet'
+
+    @property
+    def module(self):
+        return 'core'
+
+    @property
+    def opscat(self):
+        return 'CORE'
+
+
+def test_apid_contract_required_attributes_and_optional_defaults():
+    apid = CompleteApid()
+    assert isinstance(apid, ApidContract)
+    assert apid.apid == 42
+    assert apid.name == 'CORE'
+    assert apid.format == '0x%04X'
+    assert apid.title == 'Core packet'
+    assert apid.description == 'Core application packet'
+    assert apid.module == 'core'
+    assert apid.opscat == 'CORE'
+    assert apid.recorded is None
+    assert apid.downlink_info is None
+
+
+class IncompleteApid(ApidContract):
+    @property
+    def apid(self):
+        return 42
+
+
+def test_apid_contract_required_attributes_fail_lazily():
+    apid = IncompleteApid()
+    with pytest.raises(NotImplementedError):
+        apid.name
+
+
+class CompleteEvrArgument(EvrArgumentContract):
+    @property
+    def name(self):
+        return 'count'
+
+
+def test_evr_argument_contract_optional_attributes_default_to_none():
+    argument = CompleteEvrArgument()
+    assert isinstance(argument, EvrArgumentContract)
+    assert argument.name == 'count'
+    assert argument.type is None
+    assert argument.length is None
+    assert argument.enum is None
+
+
+class CompleteEnumTable(EnumTableContract):
+    @property
+    def name(self):
+        return 'modes'
+
+    @property
+    def values(self):
+        return []
+
+
+class CompleteEnumValue(EnumValueContract):
+    @property
+    def name(self):
+        return 'OFF'
+
+    @property
+    def value(self):
+        return 0
+
+
+def test_enum_contracts_expose_required_attributes():
+    table = CompleteEnumTable()
+    value = CompleteEnumValue()
+    assert isinstance(table, EnumTableContract)
+    assert isinstance(value, EnumValueContract)
+    assert table.name == 'modes'
+    assert table.values == []
+    assert value.name == 'OFF'
+    assert value.value == 0
+
+
+class ExtendedArgument(ArgumentContract):
+    @property
+    def name(self):
+        return 'mode'
+
+    @property
+    def length(self):
+        return 8
+
+
+def test_argument_contract_extended_attributes_default_to_none():
+    argument = ExtendedArgument()
+    assert argument.type is None
+    assert argument.description is None
+    assert argument.enum is None

@@ -122,6 +122,18 @@ class ArgumentContract:
     def max(self):
         return _resolve_optional(self, 'max')
 
+    @property
+    def type(self):
+        return _resolve_optional(self, 'type')
+
+    @property
+    def description(self):
+        return _resolve_optional(self, 'description')
+
+    @property
+    def enum(self):
+        return _resolve_optional(self, 'enum')
+
 
 class CommandContract:
     """
@@ -184,6 +196,111 @@ class ChannelContract:
     @property
     def measurement_id(self):
         return _resolve_optional(self, 'measurement_id')
+
+
+class ApidContract:
+    """
+    Contract for an application packet identifier definition.
+
+    Required: apid, name, format, title, description, module, opscat.
+    Optional: recorded, downlink_info.
+    """
+
+    @property
+    def apid(self):
+        return _resolve_required(self, 'apid')
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def format(self):
+        return _resolve_required(self, 'format')
+
+    @property
+    def title(self):
+        return _resolve_required(self, 'title')
+
+    @property
+    def description(self):
+        return _resolve_required(self, 'description')
+
+    @property
+    def module(self):
+        return _resolve_required(self, 'module')
+
+    @property
+    def opscat(self):
+        return _resolve_required(self, 'opscat')
+
+    @property
+    def recorded(self):
+        return _resolve_optional(self, 'recorded')
+
+    @property
+    def downlink_info(self):
+        return _resolve_optional(self, 'downlink_info')
+
+
+class EvrArgumentContract:
+    """
+    Contract for an argument interpolated into an EVR message.
+
+    Required: name.
+    Optional: type, length, enum.
+
+    EVR arguments are deliberately separate from command arguments because
+    their metadata describes message interpolation, not command encoding.
+    """
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def type(self):
+        return _resolve_optional(self, 'type')
+
+    @property
+    def length(self):
+        return _resolve_optional(self, 'length')
+
+    @property
+    def enum(self):
+        return _resolve_optional(self, 'enum')
+
+
+class EnumTableContract:
+    """
+    Contract for a named enumeration table.
+
+    Required: name, values.
+    """
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def values(self):
+        return _resolve_required(self, 'values')
+
+
+class EnumValueContract:
+    """
+    Contract for one value in an enumeration table.
+
+    Required: name, value.
+    """
+
+    @property
+    def name(self):
+        return _resolve_required(self, 'name')
+
+    @property
+    def value(self):
+        return _resolve_required(self, 'value')
 
 
 class EvrContract:
