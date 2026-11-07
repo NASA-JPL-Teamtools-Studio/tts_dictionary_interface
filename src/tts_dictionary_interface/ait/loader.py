@@ -28,12 +28,19 @@ from tts_dictionary_interface.tree import TreeSemanticDictionary, _flatten
 
 class IncludeLoader(yaml.SafeLoader):
     """
-    A yaml.SafeLoader that resolves `!include` relative to the directory
-    of the file currently being loaded, and treats every other custom
-    tag as a no-op (plain dict/list/scalar).
+    YAML loader that resolves !include relative to the including file.
+
+    It treats every other custom tag as a no-op, loading nodes as plain
+    dict/list/scalar values.
     """
 
     def __init__(self, stream):
+        """
+        Initialize the IncludeLoader with the current file's directory.
+
+        The root directory is used to resolve `!include` paths relative
+        to the including file.
+        """
         stream_name = getattr(stream, 'name', None)
         self._root_dir = os.path.dirname(stream_name) if stream_name else '.'
         super().__init__(stream)
@@ -66,9 +73,10 @@ IncludeLoader.add_constructor(None, _construct_ignore_tag)
 
 def load_yaml(path):
     """
-    Load an AIT-core-style YAML dictionary file, resolving any `!include`
-    directives (recursively, relative to each including file's own
-    directory) and ignoring all other custom tags.
+    Load an AIT-core-style YAML dictionary file.
+
+    Includes are resolved recursively relative to each including file's
+    own directory, and all other custom tags are ignored.
     """
     with open(path, 'r') as f:
         return yaml.load(f, IncludeLoader)
@@ -76,16 +84,14 @@ def load_yaml(path):
 
 class AitYamlDictionary(TreeSemanticDictionary):
     """
-    A `TreeSemanticDictionary` sourced from an AIT-flavored YAML file:
-    resolves `!include` directives via `load_yaml` and flattens the
-    result into a single flat list, so a document assembled from nested
-    includes (like the real oco3mos `tlm.yaml` manifests) behaves like
-    one flat list of items regardless of how many files it's split
-    across.
+    TreeSemanticDictionary for AIT-flavored YAML files.
 
-    Concrete subclasses set `DICTIONARY_FILENAME` (e.g. 'cmd.yaml') so
-    that `source=<a directory>` or `source=<a version string>` (resolved
-    against `DICTIONARY_MODULE`) both know which file to load.
+    It resolves !include directives via load_yaml and flattens the result
+    into a single flat list, so documents assembled from nested includes
+    behave like one flat list of items.
+
+    Concrete subclasses set DICTIONARY_FILENAME so that source arguments
+    resolved against DICTIONARY_MODULE know which file to load.
     """
 
     @classmethod

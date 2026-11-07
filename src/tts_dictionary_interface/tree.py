@@ -204,11 +204,11 @@ class TreeSemanticDictionary(BaseSemanticDictionary):
         """
         if filters:
             # For TreeSemanticDictionary, we append the filter to the path.
-            # Note: we use ' and ' as per the original implementation, 
+            # Note: we use ' and ' as per the original implementation,
             # but BaseSemanticDictionary calls select() in a loop for OR.
             filter_str = ' and '.join(f'{attr.strip()}="{val}"' for attr, val in filters.items())
             path = f"{path}[{filter_str}]"
-        
+
         return select(self.node, path)
 
     def path(self, path):

@@ -20,7 +20,7 @@ class DictionaryAttributeError(AttributeError):
 
 def _accepts_document_arg(func):
     """
-    Whether `func` is written to accept a second positional argument -- the 
+    Whether `func` is written to accept a second positional argument -- the
     constructed item itself, which exposes `.document`.
     """
     try:
@@ -60,10 +60,10 @@ class BaseSemanticDictionary:
         """
         if source is None:
             raise ValueError(f"Must specify a source for {self.__class__.__name__}")
-        
+
         # Load the root node
         self.node = self._load_source(source)
-        # The document is the root node. If we are an item of another dictionary, 
+        # The document is the root node. If we are an item of another dictionary,
         # we are passed the root of that dictionary.
         self.document = document if document is not None else self.node
         self._cache = OrderedDict()
@@ -172,7 +172,7 @@ class BaseSemanticDictionary:
         item_paths = self._effective_item_paths()
         item_ids = getattr(type(self), 'ITEM_HUMAN_UNIQUE_IDS', [])
         item_classes = getattr(type(self), 'ITEM_CLASSES', [])
-        
+
         for path, id_spec, itemclass in zip(item_paths, item_ids, item_classes):
             identifiers = [id_.strip() for id_ in id_spec.split('|')]
             for id_attr in identifiers:
@@ -193,7 +193,7 @@ class BaseSemanticDictionary:
             raise KeyError(f'No elements found with value "{item}"')
         if len(unique_elements) > 1:
             raise KeyError(f'More than one element found with value "{item}"')
-        
+
         node, itemclass, id_spec = unique_elements[0]
         return self._wrap_item(node, itemclass, id_spec, lookup_key=item)
 
@@ -227,7 +227,7 @@ class BaseSemanticDictionary:
             return_list = config[3] if len(config) > 3 else False
 
         matches = self.select(path)
-        
+
         def resolve(m):
             if is_text and hasattr(m, 'text'):
                 m = m.text
@@ -303,7 +303,7 @@ class XMLSemanticDictionary(BaseSemanticDictionary):
     def _load_source(self, source):
         if not isinstance(source, (str, os.PathLike)):
             return source.getroot() if hasattr(source, 'getroot') else source
-        
+
         source_str = str(source)
         if not source_str.lower().endswith('.xml'):
             if not self.DICTIONARY_MODULE or not self.DICTIONARY_FILENAME:
@@ -315,7 +315,7 @@ class XMLSemanticDictionary(BaseSemanticDictionary):
                     return etree.parse(str(xml_path)).getroot()
             except Exception as e:
                 raise FileNotFoundError(f"Failed to resolve {source_str}: {e}")
-        
+
         return etree.parse(source_str).getroot()
 
     def select(self, path, filters=None):
@@ -327,11 +327,11 @@ class XMLSemanticDictionary(BaseSemanticDictionary):
                     preds.append(f'text()="{val}"')
                 else:
                     preds.append(f'@{attr}="{val}"')
-            
+
             xpath = f"{path}[{' or '.join(preds)}]"
         else:
             xpath = path
-            
+
         return self.node.xpath(xpath)
 
 # Alias for backward compatibility
